@@ -1,0 +1,151 @@
+AI-Powered-Ticket-Creation-and-Categorization/
+│
+├── backend/
+│   ├── app.py
+│   ├── model.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+│
+└── README.md
+🔹 backend/app.py
+python
+Copy code
+from flask import Flask, request, jsonify
+from model import classify_ticket
+import sqlite3
+
+app = Flask(__name__)
+
+def init_db():
+    conn = sqlite3.connect('tickets.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS tickets
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  issue TEXT,
+                  title TEXT,
+                  category TEXT,
+                  priority TEXT)''')
+    conn.commit()
+    conn.close()
+
+@app.route('/create_ticket', methods=['POST'])
+def create_ticket():
+    data = request.json
+    issue = data.get('issue', '')
+
+    ticket = classify_ticket(issue)
+
+    conn = sqlite3.connect('tickets.db')
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO tickets (issue, title, category, priority) VALUES (?, ?, ?, ?)",
+        (issue, ticket['title'], ticket['category'], ticket['priority'])
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify(ticket)
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True)
+🔹 backend/model.py
+python
+Copy code
+def classify_ticket(text):
+    text_lower = text.lower()
+
+    if "login" in text_lower or "password" in text_lower:
+        category = "Authentication"
+        priority = "High"
+    elif "payment" in text_lower or "invoice" in text_lower or "bill" in text_lower:
+        category = "Billing"
+        priority = "High"
+    elif "slow" in text_lower or "error" in text_lower or "not working" in text_lower:
+        category = "Technical Issue"
+        priority = "Medium"
+    else:
+        category = "General Support"
+        priority = "Low"
+
+    title = text.split(".")[0][:50]
+
+    return {
+        "title": title.title(),
+        "category": category,
+        "priority": priority
+    }
+🔹 backend/requirements.txt
+nginx
+Copy code
+flask
+🔹 frontend/index.html
+html
+Copy code
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Ticket System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>AI Powered Ticket Creation & Categorization</h2>
+
+  <textarea id="issue" placeholder="Describe your IT issue here..."></textarea><br>
+  <button onclick="sendTicket()">Generate Ticket</button>
+
+  <div id="result"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+🔹 frontend/style.css
+css
+Copy code
+body {
+  font-family: Arial;
+  background: #f4f6f9;
+  padding: 40px;
+}
+
+textarea {
+  width: 300px;
+  height: 100px;
+}
+
+button {
+  padding: 10px 20px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+#result {
+  margin-top: 20px;
+  background: #fff;
+  padding: 15px;
+  border-radius: 5px;
+}
+🔹 frontend/script.js
+javascript
+Copy code
+function sendTicket() {
+  const issue = document.getElementById("issue").value;
+
+  fetch("http://127.0.0.1:5000/create_ticket", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ issue: issue })
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("result").innerHTML = `
+      <b>Title:</b> ${data.title}<br>
+      <b>Category:</b> ${data.category}<br>
+      <b>Priority:</b> ${data.priority}
+    `;
+  });
+}
